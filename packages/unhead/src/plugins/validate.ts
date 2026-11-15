@@ -31,7 +31,7 @@ export interface HeadValidationRule {
 export interface ValidatePluginOptions {
   /**
    * Callback to handle validation results. Receives all rules found per resolve cycle.
-   * Defaults to `console.warn` for each rule.
+   * Defaults to `console.warn` for each rule, printing each distinct finding once per process.
    */
   onReport?: (rules: HeadValidationRule[]) => void
   /**
@@ -301,6 +301,13 @@ function describeTag(tag: HeadTag): string {
   return tag.tag
 }
 
+/**
+ * Findings the default reporter has printed in this process. Shared across heads, as each
+ * request creates its own head and plugin instance.
+ */
+const warnedMessages = new Set<string>()
+const MAX_WARNED_MESSAGES = 1000
+
 export function ValidatePlugin(options: ValidatePluginOptions = {}) {
   const ruleConfig = options.rules || {}
   const root = options.root
@@ -374,7 +381,14 @@ export function ValidatePlugin(options: ValidatePluginOptions = {}) {
       }
       for (const rule of rules) {
         const loc = rule.source ? ` (${rule.source})` : ''
-        console.warn(`[unhead] ${rule.message}${loc}`)
+        const message = `[unhead] ${rule.message}${loc}`
+        // a server creates a head per request, so the same finding would print on every render
+        if (warnedMessages.has(message))
+          continue
+        if (warnedMessages.size >= MAX_WARNED_MESSAGES)
+          warnedMessages.clear()
+        warnedMessages.add(message)
+        console.warn(message)
       }
     }
 

@@ -703,6 +703,22 @@ describe('validatePlugin', () => {
   })
 
   describe('options', () => {
+    it('prints each finding once when every request creates its own head', () => {
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const render = (title: string) => {
+        const head = createHead({ disableDefaults: true, plugins: [ValidatePlugin()] })
+        head.push({ title, meta: [{ name: 'robots', content: 'index' }] })
+        renderSSRHead(head)
+      }
+      render('Repeated request')
+      const first = spy.mock.calls.length
+      expect(first).toBeGreaterThan(0)
+      render('Repeated request')
+      render('Repeated request')
+      expect(spy.mock.calls.length).toBe(first)
+      spy.mockRestore()
+    })
+
     it('uses default console.warn when no onReport', () => {
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const head = createHead({
